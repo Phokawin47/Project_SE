@@ -1,0 +1,256 @@
+import pandas as pd
+import cv2
+import numpy as np
+import os
+import joblib
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+from skimage.feature import hog
+from skimage.color import rgb2gray
+from skimage.transform import resize
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+
+# ==========================================
+# 1. Data Loading and Preprocessing Functions
+# ==========================================
+
+def load_dataset(split_path):
+    """
+    Reads images based on the _classes.csv file, extracts HOG features,
+    and returns features (X) and labels (y).
+    """
+    # Construct path to the CSV
+    csv_path = Path(split_path) / "_classes.csv"
+    
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Could not find metadata file: {csv_path}")
+
+    df = pd.read_csv(csv_path)
+    # Strip whitespace from column names
+    df.columns = df.columns.str.strip()
+
+    # Convert one-hot encoding to single label index
+    label_cols = ['0','1','2','3','4','5']
+    df['label'] = df[label_cols].idxmax(axis=1).astype(int)
+
+    X, y = [], []
+
+    print(f"Loading data from {split_path}...")
+    
+    for _, row in df.iterrows():
+        img_path = Path(split_path) / row['filename']
+        
+        # Read image using OpenCV
+        img = cv2.imread(str(img_path))
+        if img is None:
+            continue
+
+        # Resize and convert to grayscale
+        img = resize(img, (128, 128))
+        gray = rgb2gray(img)
+
+        # Extract HOG features
+        feat = hog(gray,
+                   orientations=9,
+                   pixels_per_cell=(8, 8),
+                   cells_per_block=(2, 2))
+
+        X.append(feat)
+        y.append(row['label'])
+
+    return np.array(X), np.array(y)
+
+# ==========================================
+# 2. Training Utility Function
+# ==========================================
+
+def train_and_save(model_list, model_name, model_dir, X_train, y_train, X_valid, y_valid):
+    """
+    Iterates through a list of model configurations, trains them,
+    finds the best one based on validation accuracy, and saves it.
+    """
+    best_acc = 0
+    best_model = None
+
+    print(f"Training {model_name}...")
+
+    for clf in model_list:
+        clf.fit(X_train, y_train)
+        acc = accuracy_score(y_valid, clf.predict(X_valid))
+        
+        # Keep track of the best model
+        if acc > best_acc:
+            best_acc = acc
+            best_model = clf
+
+    # Save the best model
+    os.makedirs(model_dir, exist_ok=True)
+    joblib.dump(best_model, f"{model_dir}/best_model.pkl")
+    
+    print(f"Best {model_name} Valid Accuracy: {best_acc:.4f}")
+
+    return best_model, best_acc
+
+# ==========================================
+# 3. Main Execution Block
+# ==========================================
+
+if __name__ == "__main__":
+    # --- Step 1: Load Data ---
+    # Ensure the 'train', 'valid', and 'test' directories exist in the script's location
+    try:
+        X_train, y_train = load_dataset("train")
+        X_valid, y_valid = load_dataset("valid")
+        X_test,  y_test  = load_dataset("test")
+        print(f"Data Loaded - Train: {X_train.shape}, Valid: {X_valid.shape}, Test: {X_test.shape}")
+    except Exception as e:
+        print(f"Error loading datasets: {e}")
+        exit(1)
+
+    # --- Step 2: Feature Scaling ---
+    print("Scaling features...")
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_valid = scaler.transform(X_valid)
+    X_test  = scaler.transform(X_test)
+
+    # --- Step 3: Model Training ---
+    
+    # 3.1 Logistic Regression
+    lr_models = [
+        LogisticRegression(max_iter=1000),
+        LogisticRegression(C=0.1, max_iter=1000),
+        LogisticRegression(C=1.0, max_iter=1000)
+    ]
+    lr_model, lr_acc = train_and_save(
+        lr_models, "Logistic Regression", "models/logistic_regression",
+        X_train, y_train, X_valid, y_valid
+    )
+
+    # 3.2 k-Nearest Neighbors
+    knn_models = [
+        KNeighborsClassifier(n_neighbors=3),
+        KNeighborsClassifier(n_neighbors=5),
+        KNeighborsClassifier(n_neighbors=7)
+    ]
+    knn_model, knn_acc = train_and_save(
+        knn_models, "kNN", "models/knn",
+        X_train, y_train, X_valid, y_valid
+    )
+
+    # 3.3 Random Forest
+    rf_models = [
+        RandomForestClassifier(n_estimators=100),
+        RandomForestClassifier(n_estimators=200)
+    ]
+    rf_model, rf_acc = train_and_save(
+        rf_models, "Random Forest", "models/random_forest",
+        X_train, y_train, X_valid, y_valid
+    )
+
+    # 3.4 Support Vector Machine (SVM)
+    svm_models = [
+        SVC(kernel='rbf', C=1, gamma='scale'),
+        SVC(kernel='rbf', C=10, gamma='scale')
+    ]
+    svm_model, svm_acc = train_and_save(
+        svm_models, "SVM", "models/svm",
+        X_train, y_train, X_valid, y_valid
+    )
+
+    # --- Step 4: Evaluation on Test Set ---
+    
+    # Calculate simple accuracy for overview
+    results = {
+        "Logistic Regression": accuracy_score(y_test, lr_model.predict(X_test)),
+        "kNN": accuracy_score(y_test, knn_model.predict(X_test)),
+        "Random Forest": accuracy_score(y_test, rf_model.predict(X_test)),
+        "SVM": accuracy_score(y_test, svm_model.predict(X_test))
+    }
+
+    df_results = pd.DataFrame.from_dict(
+        results, orient='index', columns=['Test Accuracy']
+    )
+
+    # Save comparison results
+    os.makedirs("results", exist_ok=True)
+    df_results.to_csv("results/comparison.csv")
+    print("\nTest Set Accuracy Comparison:")
+    print(df_results)
+
+    # --- Step 5: Visualizations ---
+
+    # 5.1 Bar Chart: Test Accuracy
+    plt.figure(figsize=(8, 6))
+    plt.bar(df_results.index, df_results['Test Accuracy'], color='skyblue')
+    plt.ylabel("Accuracy")
+    plt.title("Model Performance Comparison (Accuracy)")
+    plt.savefig("results/model_accuracy_comparison.png") # Save plot
+    plt.show()
+
+    # 5.2 Detailed Metrics (Precision, Recall, F1)
+    metrics_dict = {}
+    models = {
+        "Logistic Regression": lr_model,
+        "kNN": knn_model,
+        "Random Forest": rf_model,
+        "SVM": svm_model
+    }
+
+    print("\nDetailed Metrics Calculation...")
+    for name, model in models.items():
+        y_pred = model.predict(X_test)
+        metrics_dict[name] = {
+            "Accuracy": accuracy_score(y_test, y_pred),
+            "Precision": precision_score(y_test, y_pred, average='macro', zero_division=0),
+            "Recall": recall_score(y_test, y_pred, average='macro', zero_division=0),
+            "F1-score": f1_score(y_test, y_pred, average='macro', zero_division=0)
+        }
+
+    df_metrics = pd.DataFrame(metrics_dict).T
+    print(df_metrics)
+    df_metrics.to_csv("results/detailed_metrics.csv")
+
+    # 5.3 Confusion Matrices
+    os.makedirs("results/confusion_matrix", exist_ok=True)
+    
+    for name, model in models.items():
+        y_pred = model.predict(X_test)
+        cm = confusion_matrix(y_test, y_pred)
+
+        plt.figure(figsize=(6, 5))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+        plt.xlabel("Predicted")
+        plt.ylabel("True")
+        plt.title(f"Confusion Matrix - {name}")
+        plt.tight_layout()
+        plt.savefig(f"results/confusion_matrix/{name.replace(' ', '_')}.png")
+        plt.close() # Close plot to free memory
+
+    # 5.4 Bar Chart: Accuracy from Detailed Metrics
+    plt.figure(figsize=(8, 5))
+    plt.bar(df_metrics.index, df_metrics['Accuracy'], color='lightgreen')
+    plt.ylabel("Accuracy")
+    plt.title("Accuracy Comparison of ML Models")
+    plt.xticks(rotation=20)
+    plt.tight_layout()
+    plt.savefig("results/accuracy_bar_chart.png")
+    plt.show()
+
+    # 5.5 Bar Chart: F1-score
+    plt.figure(figsize=(8, 5))
+    plt.bar(df_metrics.index, df_metrics['F1-score'], color='salmon')
+    plt.ylabel("F1-score")
+    plt.title("F1-score Comparison of ML Models")
+    plt.xticks(rotation=20)
+    plt.tight_layout()
+    plt.savefig("results/f1_score_bar_chart.png")
+    plt.show()
+
+    print("\nProcess Completed. Results saved to 'results/' directory.")
