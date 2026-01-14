@@ -105,7 +105,7 @@ def train():
     best_loss = float('inf')
     
     print("-" * 30)
-    print("🚀 Starting Training...")
+    print("Starting Training...")
     
     for epoch in range(NUM_EPOCHS):
         # --- Train ---
