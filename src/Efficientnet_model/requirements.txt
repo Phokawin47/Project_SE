@@ -1,5 +1,9 @@
 torch
 torchvision
-scikit-learn
+matplotlib
 numpy
-pillow
+scikit-learn
+seaborn
+pandas
+Pillow
+tqdm
