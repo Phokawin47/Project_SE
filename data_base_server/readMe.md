@@ -6,4 +6,6 @@ API_KEY : eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6I
 
 # MongoDB
 
+cd data_base_server
+
 npm install express multer mongodb dotenv
