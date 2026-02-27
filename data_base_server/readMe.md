@@ -1,0 +1,9 @@
+database_password : G09_se4ai++
+
+API_URL : https://msmexbwopnweyzfucild.supabase.co
+
+API_KEY : eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zbWV4YndvcG53ZXl6ZnVjaWxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwODU3ODksImV4cCI6MjA4NzY2MTc4OX0.ob7_yclOKDTMT53f3xgfYf6-xcb101DbsOFGLyxYjqM
+
+# MongoDB
+
+npm install express multer mongodb dotenv

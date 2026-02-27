@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h3 id="title"></h3>
+
+<audio id="player" controls></audio>
+
+<script>
+  const filename = "0.mp3"; // เปลี่ยนชื่อเพลงตรงนี้
+
+  document.getElementById("title").innerText = "Playing: " + filename;
+
+  const audio = document.getElementById("player");
+  audio.src = "http://localhost:3000/audio/" + filename;
+</script>
+
+</body>
+</html>

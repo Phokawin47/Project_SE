@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Audio Upload</title>
+</head>
+<body>
+
+<h2>Upload Audio (ไม่เกิน 1MB)</h2>
+<input type="file" id="audioFile" accept="audio/*">
+<button id="uploadBtn">Upload</button>
+
+<h2>Player</h2>
+<audio id="player" controls></audio>
+
+<!-- Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- โหลดไฟล์ JS ของเรา -->
+<script src="app.js"></script>
+
+</body>
+</html>
