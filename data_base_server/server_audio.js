@@ -26,28 +26,43 @@ async function start() {
   console.log("Connected to MongoDB & GridFS Ready");
 
   // Upload + Save to GridFS
-  app.post("/upload", upload.single("audio"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
+app.post("/upload", upload.single("audio"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
 
-      const readableStream = Readable.from(req.file.buffer);
+    // 🔎 เช็คก่อนว่ามีไฟล์ชื่อเดียวกันหรือยัง
+    const existingFile = await bucket.find({
+      filename: req.file.originalname
+    }).toArray();
 
-      const uploadStream = bucket.openUploadStream(req.file.originalname, {
-        contentType: req.file.mimetype
+    if (existingFile.length > 0) {
+      return res.status(409).json({
+        message: "File already exists",
+        filename: req.file.originalname
+      });
+    }
+
+    const readableStream = Readable.from(req.file.buffer);
+
+    const uploadStream = bucket.openUploadStream(req.file.originalname, {
+      contentType: req.file.mimetype
+    });
+
+    readableStream.pipe(uploadStream)
+      .on("error", () => res.status(500).json({ error: "Upload error" }))
+      .on("finish", () => {
+        res.json({
+          message: "Upload success",
+          fileId: uploadStream.id
+        });
       });
 
-      readableStream.pipe(uploadStream)
-        .on("error", () => res.status(500).json({ error: "Upload error" }))
-        .on("finish", () => {
-          res.json({ message: "Upload success", fileId: uploadStream.id });
-        });
-
-    } catch (err) {
-      res.status(500).json({ error: "Server error" });
-    }
-  });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
   // Stream audio
   app.get("/audio/:filename", async (req, res) => {
