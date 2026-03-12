@@ -5,7 +5,7 @@ const multer = require("multer");
 const { Readable } = require("stream");
 
 const app = express();
-const uri = process.env.MONGO_URI;
+const uri = process.env.MONGO1_URI;
 
 // 🔥 ต้องมีตัวนี้
 const client = new MongoClient(uri);
@@ -17,10 +17,10 @@ const upload = multer({ storage: multer.memoryStorage() });
 async function start() {
   await client.connect();
 
-  const db = client.db("myapp");
+  const db = client.db("FunnyFingerAudioDB");
 
   bucket = new GridFSBucket(db, {
-    bucketName: "audioFiles"
+    bucketName: "SFXFiles"
   });
 
   console.log("Connected to MongoDB & GridFS Ready");
